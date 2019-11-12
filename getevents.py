@@ -145,8 +145,8 @@ def createdicts(cgx_session):
             site_name_id_dict[sname] = sid
 
     else:
-        print "ERR: Could not get sites"
-        print cloudgenix.jd_detailed(resp)
+        print("ERR: Could not get sites")
+        print(cloudgenix.jd_detailed(resp))
 
 
     print("\tElements..")
