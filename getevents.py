@@ -456,6 +456,7 @@ def go():
     for event in events:
         cleared = "n/a"
         correlation_id = "n/a"
+        acknowledged = "n/a"
         site = "Unassigned"
 
         entity_ref = get_entity(cgx_session, event)
@@ -468,6 +469,7 @@ def go():
         if event['type'] == "alarm":
             cleared = event['cleared']
             correlation_id = event['correlation_id']
+            acknowledged = event['acknowledged']
 
         csvdata = csvdata.append({"time":event['time'],
                                   "code":event['code'],
@@ -482,7 +484,7 @@ def go():
                                   "info":event['info'],
                                   "info text":info,
                                   "cleared":cleared,
-                                  "acknowledged":event['acknowledged'],
+                                  "acknowledged":acknowledged,
                                   "acknowledgement_info":event['acknowledgement_info']},ignore_index=True)
 
         barcount += 1
