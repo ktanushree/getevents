@@ -46,6 +46,8 @@ ELEMENTS = "elements"
 INTERFACES = "interfaces"
 WANINTERFACES = "waninterfaces"
 
+RANGE = "RANGE"
+
 xlate_info = ["network_directinternet_down", "network_vpnlink_down",
            "network_vpnss_unavailable", "network_vpnpeer_unreachable", "network_vpnss_mismatch",
           "network_directprivate_down", "network_vpnpeer_unavailable", "network_vpnbfd_down"]
@@ -75,11 +77,17 @@ except ImportError:
 
 
 
-def get_events(cgx_session, numhours, event_codes, sitelist):
+def get_events(cgx_session, numhours, starttime, endtime, event_codes, sitelist):
 
-    current_time = datetime.datetime.utcnow().replace(second=0, microsecond=0)
-    start_time = current_time - datetime.timedelta(hours= numhours)
-    start_time_iso = start_time.isoformat() + "Z"
+    if numhours == RANGE:
+        start_time_iso = starttime.isoformat() + "Z"
+        end_time_iso = endtime.isoformat() + "Z"
+
+    else:
+        current_time = datetime.datetime.utcnow().replace(second=0, microsecond=0)
+        start_time = current_time - datetime.timedelta(hours= numhours)
+        start_time_iso = start_time.isoformat() + "Z"
+        end_time_iso = None
 
     eventlist = []
 
@@ -99,7 +107,8 @@ def get_events(cgx_session, numhours, event_codes, sitelist):
             "site": sitelist
         },
         "severity": [],
-        "start_time":start_time_iso
+        "start_time":start_time_iso,
+        "end_time":end_time_iso
     }
 
     more_events=True
@@ -233,6 +242,7 @@ def get_info(cgx_session, alarm):
             elemid = info['element_id']
             interfaceid = info['interface_id']
             siteid = alarm['site_id']
+            iname = None
 
             if (siteid,elemid,interfaceid) in intf_id_name_dict.keys():
                 iname = intf_id_name_dict[(siteid,elemid,interfaceid)]
@@ -278,6 +288,7 @@ def get_entity(cgx_session, alarm):
                 sid = entitymap[SITES]
                 eid = entitymap[ELEMENTS]
                 iid = entitymap[INTERFACES]
+                interface = None
 
                 if (sid,eid,iid) in intf_id_name_dict.keys():
                     interface = intf_id_name_dict[(sid,eid,iid)]
@@ -293,6 +304,7 @@ def get_entity(cgx_session, alarm):
             elif item == WANINTERFACES:
                 sid = entitymap[SITES]
                 swiid = entitymap[WANINTERFACES]
+                swi = None
 
                 if (sid,swiid) in swi_id_name_dict.keys():
                     swi = swi_id_name_dict[(sid,swiid)]
@@ -337,11 +349,13 @@ def go():
     login_group.add_argument("--pass", "-P", help="Use this Password instead of prompting",
                              default=None)
 
-    # Commandline for entering Site info
+    # Commandline for entering Event Filters
     site_group = parser.add_argument_group('Filters for events', 'The following attributes will be used to query events')
     site_group.add_argument("--eventcodes", "-EC", help="List event codes you want to query for", default=None)
-    site_group.add_argument("--hour", "-H", help="Number of hours from now you need the events queried for", default=None)
     site_group.add_argument("--sitename", "-S", help="Name of the Site you want events filtered for. For multiple sites, separate names by using a comma.", default=None)
+    site_group.add_argument("--hour", "-H", help="Number of hours from now you need the events queried for. Or use the keyword RANGE to provide a time range", default=None)
+    site_group.add_argument("--starttime", "-ST", help="Start time in format YYYY-MM-DDTHH:MM:SSZ", default=None)
+    site_group.add_argument("--endtime", "-ET", help="End time in format YYYY-MM-DDTHH:MM:SSZ", default=None)
 
     args = vars(parser.parse_args())
 
@@ -349,8 +363,12 @@ def go():
     # Check if YAML config files was provided via CLI
     ############################################################################
     eventcodes = args['eventcodes']
-    numhours = int(args['hour'])
+    numhours = args['hour']
     sitename = args['sitename']
+    starttime = args['starttime']
+    endtime = args['endtime']
+    stime = None
+    etime = None
 
     if eventcodes is None:
         print("WARN: No event codes listed. All events will be returned.")
@@ -358,6 +376,25 @@ def go():
     if numhours is None or numhours <= 0:
         print("ERR: Invalid number of hours.")
         sys.exit()
+
+    if numhours == RANGE:
+        if starttime is None or endtime is None:
+            print("ERR: For time range, please provide both starttime and endtime in format YYYY-MM-DDTHH:MM:SSZ")
+            sys.exit()
+
+        else:
+            if "." in starttime:
+                stime = datetime.datetime.strptime(starttime, "%Y-%m-%dT%H:%M:%S.%fZ")
+            else:
+                stime = datetime.datetime.strptime(starttime, "%Y-%m-%dT%H:%M:%SZ")
+
+            if "." in endtime:
+                etime = datetime.datetime.strptime(endtime, "%Y-%m-%dT%H:%M:%S.%fZ")
+            else:
+                etime = datetime.datetime.strptime(endtime, "%Y-%m-%dT%H:%M:%SZ")
+
+    else:
+        numhours = int(numhours)
 
     if sitename is None:
         print("INFO: No site filter configured. All events will be returned")
@@ -427,7 +464,7 @@ def go():
         eventcodes = eventcodes.replace(" ","")
         event_codes = eventcodes.split(",")
 
-    events = get_events(cgx_session, numhours, event_codes, sitelist)
+    events = get_events(cgx_session, numhours, stime, etime, event_codes, sitelist)
 
     ############################################################################
     # Write to CSV
@@ -444,7 +481,7 @@ def go():
         csv_file.write('Element,Serial Number,Site\n')
         csv_file.flush()
 
-    csvdata = pd.DataFrame(columns=["time","code","id","severity","type","correlation_id","site","element","entity_ref","entity_ref text","info","info text","cleared","acknowledged","acknowledgement_info"])
+    csvdata = pd.DataFrame(columns=["time","time_ms","time_sms","code","id","severity","type","correlation_id","site","element","entity_ref","entity_ref text","info","info text","cleared","acknowledged","acknowledgement_info"])
     print("INFO: Creating pandas dict")
 
     firstbar = len(events) + 1
@@ -459,6 +496,16 @@ def go():
         acknowledged = "n/a"
         site = "Unassigned"
 
+        if "." in event['time']:
+            date = datetime.datetime.strptime(event['time'], "%Y-%m-%dT%H:%M:%S.%fZ")
+        else:
+            date = datetime.datetime.strptime(event['time'], "%Y-%m-%dT%H:%M:%SZ")
+
+        time_ms = date.replace(microsecond=0)
+        time_ms = time_ms.isoformat() + "Z"
+        time_sms = date.replace(second=0, microsecond=0)
+        time_sms = time_sms.isoformat() + "Z"
+
         entity_ref = get_entity(cgx_session, event)
         info = get_info(cgx_session, event)
 
@@ -472,6 +519,8 @@ def go():
             acknowledged = event['acknowledged']
 
         csvdata = csvdata.append({"time":event['time'],
+                                  "time_ms":time_ms,
+                                  "time_sms":time_sms,
                                   "code":event['code'],
                                   "id":event['id'],
                                   "severity":event['severity'],

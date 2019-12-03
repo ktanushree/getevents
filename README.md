@@ -10,6 +10,7 @@ Enables downloading of alarms and alerts raised on the CloudGenix managed networ
 * Python >= 2.7 or >=3.6
 * Python modules:
     * CloudGenix Python SDK >= 5.1.1b1 - <https://github.com/CloudGenix/sdk-python>
+* ProgressBar2
 
 #### License
 MIT
@@ -37,8 +38,9 @@ Help Text:
 ```angular2
 Tanushrees-MacBook-Pro:getevents tanushreekamath$ ./getevents.py -h
 usage: getevents.py [-h] [--controller CONTROLLER] [--email EMAIL]
-                    [--pass PASS] [--eventcodes EVENTCODES] [--hour HOUR]
-                    [--sitename SITENAME]
+                    [--pass PASS] [--eventcodes EVENTCODES]
+                    [--sitename SITENAME] [--hour HOUR]
+                    [--starttime STARTTIME] [--endtime ENDTIME]
 
 CloudGenix: Get Events Script.
 
@@ -64,16 +66,21 @@ Filters for events:
 
   --eventcodes EVENTCODES, -EC EVENTCODES
                         List event codes you want to query for
-  --hour HOUR, -H HOUR  Number of hours from now you need the events queried
-                        for
   --sitename SITENAME, -S SITENAME
                         Name of the Site you want events filtered for. For
                         multiple sites, separate names by using a comma.
+  --hour HOUR, -H HOUR  Number of hours from now you need the events queried
+                        for. Or use the keyword RANGE to provide a time range
+  --starttime STARTTIME, -ST STARTTIME
+                        Start time in format YYYY-MM-DDTHH:MM:SSZ
+  --endtime ENDTIME, -ET ENDTIME
+                        End time in format YYYY-MM-DDTHH:MM:SSZ
 ```
 
 #### Version
 | Version | Build | Changes |
 | ------- | ----- | ------- |
+| **1.0.0** | **b2** | Added support for time range. Fixed minor bug.|
 | **1.0.0** | **b1** | Initial Release. |
 
 
