@@ -373,7 +373,7 @@ def go():
     if eventcodes is None:
         print("WARN: No event codes listed. All events will be returned.")
 
-    if numhours is None or numhours <= 0:
+    if numhours is None:
         print("ERR: Invalid number of hours.")
         sys.exit()
 
@@ -395,6 +395,9 @@ def go():
 
     else:
         numhours = int(numhours)
+        if numhours <= 0:
+            print("ERR: Invalid number of hours.")
+            sys.exit()
 
     if sitename is None:
         print("INFO: No site filter configured. All events will be returned")
