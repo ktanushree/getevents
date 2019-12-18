@@ -172,6 +172,9 @@ def createdicts(cgx_session):
             elem_id_name_dict[eid] = ename
 
             sid = elem['site_id']
+            if sid == "1":
+                continue
+
             eid_sid_dict[eid] = sid
 
 
@@ -497,6 +500,7 @@ def go():
         cleared = "n/a"
         correlation_id = "n/a"
         acknowledged = "n/a"
+        acknowledgement_info = "n/a"
         site = "Unassigned"
 
         if "." in event['time']:
@@ -516,10 +520,15 @@ def go():
             sid = eid_sid_dict[event['element_id']]
             site = site_id_name_dict[sid]
 
+        else:
+            print("INFO: Element not attached to site. {}".format(event))
+            site = "Unassigned"
+            
         if event['type'] == "alarm":
             cleared = event['cleared']
             correlation_id = event['correlation_id']
             acknowledged = event['acknowledged']
+            acknowledgement_info = event['acknowledgement_info']
 
         csvdata = csvdata.append({"time":event['time'],
                                   "time_ms":time_ms,
@@ -537,7 +546,7 @@ def go():
                                   "info text":info,
                                   "cleared":cleared,
                                   "acknowledged":acknowledged,
-                                  "acknowledgement_info":event['acknowledgement_info']},ignore_index=True)
+                                  "acknowledgement_info":acknowledgement_info},ignore_index=True)
 
         barcount += 1
         pbar.update(barcount)
