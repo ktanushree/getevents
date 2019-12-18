@@ -80,6 +80,7 @@ Filters for events:
 #### Version
 | Version | Build | Changes |
 | ------- | ----- | ------- |
+| **1.0.0** | **b3** | Minor bug fixes.|
 | **1.0.0** | **b2** | Added support for time range. Fixed minor bug.|
 | **1.0.0** | **b1** | Initial Release. |
 
