@@ -516,6 +516,11 @@ def go():
         entity_ref = get_entity(cgx_session, event)
         info = get_info(cgx_session, event)
 
+        if event['element_id'] in elem_id_name_dict.keys():
+            elemname = elem_id_name_dict[event['element_id']]
+        else:
+            elemname = event['element_id']
+
         if event['element_id'] in eid_sid_dict.keys():
             sid = eid_sid_dict[event['element_id']]
             site = site_id_name_dict[sid]
@@ -539,7 +544,7 @@ def go():
                                   "type":event['type'],
                                   "correlation_id":correlation_id,
                                   "site":site,
-                                  "element":elem_id_name_dict[event['element_id']],
+                                  "element":elemname,
                                   "entity_ref":event['entity_ref'],
                                   "entity_ref text":entity_ref,
                                   "info":event['info'],
