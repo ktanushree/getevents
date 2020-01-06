@@ -39,7 +39,7 @@ intf_id_name_dict = {}
 intf_name_id_dict = {}
 swi_id_name_dict = {}
 swi_name_id_dict = {}
-
+userid_username_dict = {}
 
 SITES = "sites"
 ELEMENTS = "elements"
@@ -214,6 +214,17 @@ def createdicts(cgx_session):
         else:
             print("ERR: Could not query for site wan interfaces")
             print(cloudgenix.jd_detailed(resp))
+
+    print("\tOperators..")
+    resp = cgx_session.get.operators_t()
+    if resp.cgx_status:
+        userlist = resp.cgx_content.get("items", None)
+        for user in userlist:
+            username = "{} {} ({})".format(user['first_name'], user.get('last_name', None), user['email'])
+            userid_username_dict[user['id']] = username
+    else:
+        print("ERR: Could not query for operators")
+        print(cloudgenix.jd_detailed(resp))
 
     return
 
@@ -516,24 +527,33 @@ def go():
         entity_ref = get_entity(cgx_session, event)
         info = get_info(cgx_session, event)
 
-        if event['element_id'] in elem_id_name_dict.keys():
-            elemname = elem_id_name_dict[event['element_id']]
-        else:
-            elemname = event['element_id']
-
         if event['element_id'] in eid_sid_dict.keys():
             sid = eid_sid_dict[event['element_id']]
             site = site_id_name_dict[sid]
 
         else:
-            print("INFO: Element not attached to site. {}".format(event))
+            #print("INFO: Element not attached to site. {}".format(event))
             site = "Unassigned"
-            
+
         if event['type'] == "alarm":
             cleared = event['cleared']
             correlation_id = event['correlation_id']
             acknowledged = event['acknowledged']
-            acknowledgement_info = event['acknowledgement_info']
+            if acknowledged:
+                acknowledgementinfo = event['acknowledgement_info']
+                ackuserid = acknowledgementinfo.get("acknowledged_by", None)
+                acktime = acknowledgementinfo.get("acknowledgement_time", None)
+                if ackuserid in userid_username_dict.keys():
+                    ackuser = userid_username_dict[ackuserid]
+                else:
+                    ackuser = ackuserid
+
+                acknowledgement_info = "User:{} Time:{}".format(ackuser,acktime)
+
+        if event['element_id'] in elem_id_name_dict.keys():
+            element = elem_id_name_dict[event['element_id']]
+        else:
+            element = event['element_id']
 
         csvdata = csvdata.append({"time":event['time'],
                                   "time_ms":time_ms,
@@ -544,7 +564,7 @@ def go():
                                   "type":event['type'],
                                   "correlation_id":correlation_id,
                                   "site":site,
-                                  "element":elemname,
+                                  "element":element,
                                   "entity_ref":event['entity_ref'],
                                   "entity_ref text":entity_ref,
                                   "info":event['info'],
