@@ -10,6 +10,7 @@ Enables downloading of alarms and alerts raised on the CloudGenix managed networ
 * Python >= 2.7 or >=3.6
 * Python modules:
     * CloudGenix Python SDK >= 5.1.1b1 - <https://github.com/CloudGenix/sdk-python>
+    * CloudGenix ID-Name Utility >= 2.0.1 - <https://github.com/ebob9/cloudgenix-idname>
 * ProgressBar2
 
 #### License
@@ -80,6 +81,7 @@ Filters for events:
 #### Version
 | Version | Build | Changes |
 | ------- | ----- | ------- |
+| **1.0.0** | **b5** | Included idname utility. Made edits to include VPN link name in info.|
 | **1.0.0** | **b4** | Minor bug fixes. Acknowledgment info now lists username and email.|
 | **1.0.0** | **b3** | Minor bug fixes.|
 | **1.0.0** | **b2** | Added support for time range. Fixed minor bug.|

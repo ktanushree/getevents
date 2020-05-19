@@ -20,6 +20,7 @@ import argparse
 import codecs
 import csv
 import cloudgenix
+import cloudgenix_idname
 
 # bar
 from progressbar import Bar, ETA, Percentage, ProgressBar
@@ -31,15 +32,7 @@ SCRIPT_NAME = 'CloudGenix: Get Events Script'
 
 
 # Process tags
-elem_id_name_dict = {}
-site_id_name_dict = {}
-site_name_id_dict = {}
-eid_sid_dict = {}
-intf_id_name_dict = {}
-intf_name_id_dict = {}
-swi_id_name_dict = {}
-swi_name_id_dict = {}
-userid_username_dict = {}
+
 
 SITES = "sites"
 ELEMENTS = "elements"
@@ -79,6 +72,9 @@ except ImportError:
 
 def get_events(cgx_session, numhours, starttime, endtime, event_codes, sitelist):
 
+    global eventsdf
+    eventsdf = pd.DataFrame()
+
     if numhours == RANGE:
         start_time_iso = starttime.isoformat() + "Z"
         end_time_iso = endtime.isoformat() + "Z"
@@ -117,6 +113,9 @@ def get_events(cgx_session, numhours, starttime, endtime, event_codes, sitelist)
         resp = cgx_session.post.events_query(data=events_query_payload)
         if resp.cgx_status:
             eventlist += resp.cgx_content.get("items", None)
+            dp = pd.DataFrame(eventlist)
+            eventsdf = pd.concat([eventsdf,dp], ignore_index=True)
+
             offset = resp.cgx_content['_offset']
             print ("\tTotal events: {0}. Events Retrieved: {1}. Events Pending: {2}".format(resp.cgx_content['total_count'],resp.cgx_content['included_count'], (resp.cgx_content['total_count']-resp.cgx_content['included_count']) ))
 
@@ -135,85 +134,47 @@ def get_events(cgx_session, numhours, starttime, endtime, event_codes, sitelist)
             more_events = False
             return []
 
-    #print "\t{0}:{1} returned".format(datetime.datetime.utcnow(), len(eventlist))
-    return eventlist
+    return eventsdf
 
 
 
 def createdicts(cgx_session):
+    global elem_id_name_dict
+    global site_id_name_dict
+    global site_name_id_dict
+    global eid_sid_dict
+    global intf_id_name_dict
+    global swi_id_name_dict
+    global userid_username_dict
+    global path_id_name_dict
+
+    elem_id_name_dict = {}
+    site_id_name_dict = {}
+    site_name_id_dict = {}
+    eid_sid_dict = {}
+    intf_id_name_dict = {}
+    swi_id_name_dict = {}
+    userid_username_dict = {}
+    path_id_name_dict = {}
+
+    idname = cloudgenix_idname.CloudGenixIDName(cgx_session)
+
     print("INFO: Building Translation dicts")
     print("\tSites..")
-    resp = cgx_session.get.sites()
-    if resp.cgx_status:
-        sitelist = resp.cgx_content.get("items", None)
-
-        for site in sitelist:
-            sid = site['id']
-            sname = site['name']
-            site_id_name_dict[sid] = sname
-            site_name_id_dict[sname] = sid
-
-    else:
-        print("ERR: Could not get sites")
-        print(cloudgenix.jd_detailed(resp))
+    site_id_name_dict = idname.generate_sites_map()
+    site_name_id_dict = idname.generate_sites_map(key_val='name',value_val='id')
 
 
     print("\tElements..")
-    resp = cgx_session.get.elements()
-    if resp.cgx_status:
-        elemlist = resp.cgx_content.get("items", None)
-
-        for elem in elemlist:
-            eid = elem['id']
-            ename = elem['name']
-            if ename is None:
-                ename = elem['serial_number']
-
-            elem_id_name_dict[eid] = ename
-
-            sid = elem['site_id']
-            if sid == "1":
-                continue
-
-            eid_sid_dict[eid] = sid
-
+    elem_id_name_dict = idname.generate_elements_map()
+    eid_sid_dict = idname.generate_elements_map(key_val='id',value_val='site_id')
 
     print("\tInterfaces..")
-    for eid in eid_sid_dict.keys():
-        sid = eid_sid_dict[eid]
-        if sid == "1":
-            continue
-
-        resp = cgx_session.get.interfaces(site_id=sid, element_id=eid)
-        if resp.cgx_status:
-            intflist = resp.cgx_content.get("items",None)
-
-            for intf in intflist:
-                iid = intf['id']
-                iname = intf['name']
-
-                intf_id_name_dict[(sid,eid,iid)] = iname
-                intf_name_id_dict[(sid,eid,iname)] = iid
-
-        else:
-            print("ERR: Could not query for interfaces")
-            print(cloudgenix.jd_detailed(resp))
+    intf_id_name_dict = idname.generate_interfaces_map()
 
     print("\tSite WAN Interfaces..")
-    for sid in site_id_name_dict.keys():
-        resp = cgx_session.get.waninterfaces(site_id = sid)
-        if resp.cgx_status:
-            swilist = resp.cgx_content.get("items", None)
+    swi_id_name_dict = idname.generate_waninterfaces_map()
 
-            for swi in swilist:
-                swiid = swi['id']
-                swiname = swi['name']
-
-                swi_id_name_dict[(sid,swiid)] = swiname
-                swi_name_id_dict[(sid,swiname)] = swiid
-        else:
-            print("ERR: Could not query for site wan interfaces")
-            print(cloudgenix.jd_detailed(resp))
 
     print("\tOperators..")
     resp = cgx_session.get.operators_t()
@@ -226,56 +187,141 @@ def createdicts(cgx_session):
         print("ERR: Could not query for operators")
         print(cloudgenix.jd_detailed(resp))
 
+
+    print("\tSecure Fabric links")
+
+    for siteid in site_id_name_dict.keys():
+        resp = cgx_session.post.topology(data={"type": "basenet", "nodes": [siteid], "links_only": True})
+        if resp.cgx_status:
+            links = resp.cgx_content.get("links", None)
+            for path in links:
+                if path["type"] in ["anynet", "public-anynet", "private-anynet"]:
+                    # anynet link, get relevant names
+                    source_site_name = path.get("source_site_name")
+                    target_site_name = path.get("target_site_name")
+                    source_wan_network = path.get("source_wan_network")
+                    target_wan_network = path.get("target_wan_network")
+                    source_circuit_name = path.get("source_circuit_name")
+                    target_circuit_name = path.get("target_circuit_name")
+
+                    # circuit names may be blank. Normalize.
+                    if not source_circuit_name:
+                        source_circuit_name = "Circuit to {0}".format(source_wan_network)
+                    if not target_circuit_name:
+                        target_circuit_name = "Circuit to {0}".format(target_wan_network)
+
+                    pathname = "{0} ('{1}' via '{2}') <-> ('{3}' via '{4}') {5}".format(
+                        source_site_name,
+                        source_wan_network,
+                        source_circuit_name,
+                        target_circuit_name,
+                        target_wan_network,
+                        target_site_name
+                    )
+                elif path["type"] in ["vpn"]:
+                    # vpn link, get relevant names
+                    source_site_name = path.get("source_site_name")
+                    target_site_name = path.get("target_site_name")
+                    source_wan_network = path.get("source_wan_network")
+                    target_wan_network = path.get("target_wan_network")
+                    source_circuit_name = path.get("source_circuit_name")
+                    target_circuit_name = path.get("target_circuit_name")
+                    # circuit names may be blank. Normalize.
+                    if not source_circuit_name:
+                        source_circuit_name = "Circuit to {0}".format(source_wan_network)
+                    if not target_circuit_name:
+                        target_circuit_name = "Circuit to {0}".format(target_wan_network)
+                    # for vpn, get element names.
+                    source_node_id = path.get("source_node_id")
+                    source_element_name = elem_id_name_dict[source_node_id]
+                    target_node_id = path.get("target_node_id")
+                    target_element_name = elem_id_name_dict[target_node_id]
+
+                    pathname = "[{0}] : {1} ('{2}' via '{3}') <-> ('{4}' via '{5}') {6} [{7}]".format(
+                        source_element_name,
+                        source_site_name,
+                        source_wan_network,
+                        source_circuit_name,
+                        target_circuit_name,
+                        target_wan_network,
+                        target_site_name,
+                        target_element_name
+                    )
+
+                elif path["type"] in ["priv-wan-stub", "internet-stub"]:
+                    # Stub (direct) links.
+                    target_site_name = site_id_name_dict[path.get("target_node_id", "")]
+                    if not target_site_name:
+                        target_site_name = "UNKNOWN"
+
+                    target_circuit_name = path.get("target_circuit_name")
+                    network = path.get("network")
+                    if not target_circuit_name:
+                        target_circuit_name = "Circuit to {0}".format(network)
+
+                    if path["type"]== "priv-wan-stub":
+                        dest_name = "Direct Private WAN"
+                    elif path["type"] == "internet-stub":
+                        dest_name = "Direct Internet"
+                    else:
+                        dest_name = "UNKNOWN"
+
+                    pathname = "{0} ('{1}' via '{2}') <-> {3}".format(
+                        target_site_name,
+                        network,
+                        target_circuit_name,
+                        dest_name
+                    )
+                else:
+                    continue
+
+                path_id_name_dict[path['path_id']] = pathname
+
     return
 
 
-def get_info(cgx_session, alarm):
-    info = alarm['info']
-    if alarm['code'].lower() in xlate_info:
-        if "VPN" in alarm['code']:
-            if alarm['code'].lower() == "network_vpnpeer_unavailable":
-                peerid = info['peer_site_id']
-                if peerid in site_id_name_dict.keys():
-                    peersite = site_id_name_dict[peerid]
-                    info = "Peer Site: {}".format(peersite)
-            else:
-                anynetid = info['al_id']
-                resp = cgx_session.get.anynetlinks_t(anynetlink_id=anynetid)
-                if resp.cgx_status:
-                    vpndata = resp.cgx_content
+def get_info(alarminfo):
+    peerid = alarminfo.get("peer_site_id", None)
+    anynetid = alarminfo.get("al_id",None)
+    vpn_link_id = alarminfo.get("vpn_link_id",None)
+    info = None
+    if peerid:
+        if peerid in site_id_name_dict.keys():
+            peersite = site_id_name_dict[peerid]
+            info = "Peer Site: {}".format(peersite)
 
-                    #
-                    # TO DO: Update info to include circuit names once CGB-14459 is resolved
-                    #
-                    info = "{}({}) <-> ({}){}".format(vpndata['source_site_name'], vpndata['source_wan_network'],
-                                                      vpndata['target_wan_network'], vpndata['target_site_name'])
-
-                else:
-                    info = "Could not query anynet link {}".format(anynetid)
+    if anynetid:
+        if anynetid in path_id_name_dict.keys():
+            info = path_id_name_dict[anynetid]
         else:
-            elemid = info['element_id']
-            interfaceid = info['interface_id']
-            siteid = alarm['site_id']
-            iname = None
+            info = "Could not query anynet link {}".format(anynetid)
 
-            if (siteid,elemid,interfaceid) in intf_id_name_dict.keys():
-                iname = intf_id_name_dict[(siteid,elemid,interfaceid)]
-            else:
-                resp = cgx_session.get.interfaces(site_id=siteid, element_id=elemid, interface_id=interfaceid)
-                if resp.cgx_status:
-                    iname = resp.cgx_content.get("name",None)
+    if vpn_link_id:
+        if vpn_link_id in path_id_name_dict.keys():
+            info = path_id_name_dict[vpn_link_id]
+        else:
+            info = "Could not query vpn link {}".format(vpn_link_id)
 
-            if iname:
-                info = "Element: {}\nInterface: {}".format(elem_id_name_dict[elemid], iname)
-            else:
-                info = "Element: {}".format(elem_id_name_dict[elemid])
+    if "element_id" in alarminfo.keys():
+        elemid = alarminfo.get("element_id",None)
+        interfaceid = alarminfo.get("interface_id",None)
+        siteid = eid_sid_dict[elemid]
+        iname = None
+
+        if interfaceid in intf_id_name_dict.keys():
+            iname = intf_id_name_dict[interfaceid]
+
+        if iname:
+            info = "Element: {}\nInterface: {}".format(elem_id_name_dict[elemid], iname)
+        else:
+            info = "Element: {}".format(elem_id_name_dict[elemid])
+
 
     return info
 
 
-def get_entity(cgx_session, alarm):
+def get_entity(entity_ref):
     entitymap = {}
-    entity_ref = alarm['entity_ref']
     tmp = entity_ref.split('/')
     octets = len(tmp)
     i = 0
@@ -304,11 +350,11 @@ def get_entity(cgx_session, alarm):
                 iid = entitymap[INTERFACES]
                 interface = None
 
-                if (sid,eid,iid) in intf_id_name_dict.keys():
-                    interface = intf_id_name_dict[(sid,eid,iid)]
-                else:
-                    resp = cgx_session.get.interfaces(site_id=sid, element_id=eid, interface_id=iid)
-                    interface = resp.cgx_content.get("name", None)
+                if iid in intf_id_name_dict.keys():
+                    interface = intf_id_name_dict[iid]
+                # else:
+                #     resp = cgx_session.get.interfaces(site_id=sid, element_id=eid, interface_id=iid)
+                #     interface = resp.cgx_content.get("name", None)
 
                 if interface:
                     entityname = "Interface: " + interface
@@ -320,11 +366,11 @@ def get_entity(cgx_session, alarm):
                 swiid = entitymap[WANINTERFACES]
                 swi = None
 
-                if (sid,swiid) in swi_id_name_dict.keys():
-                    swi = swi_id_name_dict[(sid,swiid)]
-                else:
-                    resp = cgx_session.get.waninterfaces(site_id=sid, waninterface_id=swiid)
-                    swi = resp.cgx_content.get("name", None)
+                if swiid in swi_id_name_dict.keys():
+                    swi = swi_id_name_dict[swiid]
+                # else:
+                #     resp = cgx_session.get.waninterfaces(site_id=sid, waninterface_id=swiid)
+                #     swi = resp.cgx_content.get("name", None)
 
                 if swi:
                     entityname = "WAN Interface: " + swi
@@ -340,6 +386,74 @@ def get_entity(cgx_session, alarm):
             continue
 
     return returnval
+
+
+
+def gettime_ms(x):
+    if "." in x:
+        date = datetime.datetime.strptime(x, "%Y-%m-%dT%H:%M:%S.%fZ")
+    else:
+        date = datetime.datetime.strptime(x, "%Y-%m-%dT%H:%M:%SZ")
+
+    time_ms = date.replace(microsecond=0)
+    time_ms = time_ms.isoformat() + "Z"
+
+    return time_ms
+
+
+
+
+def gettime_sms(x):
+    if "." in x:
+        date = datetime.datetime.strptime(x, "%Y-%m-%dT%H:%M:%S.%fZ")
+    else:
+        date = datetime.datetime.strptime(x, "%Y-%m-%dT%H:%M:%SZ")
+
+    time_sms = date.replace(second=0, microsecond=0)
+    time_sms = time_sms.isoformat() + "Z"
+
+
+    return time_sms
+
+
+def getsitename(elemid):
+
+    site = "Unassigned"
+    if elemid in eid_sid_dict.keys():
+        sid = eid_sid_dict[elemid]
+        site = site_id_name_dict[sid]
+
+    return site
+
+
+def getelemname(elemid):
+    ename = elemid
+    if elemid in elem_id_name_dict.keys():
+        ename = elem_id_name_dict[elemid]
+
+    return ename
+
+
+def getackinfo(acknowledgementinfo):
+    acknowledgement_info = "n/a"
+
+    if acknowledgementinfo == "n/a":
+        return acknowledgement_info
+
+    if acknowledgementinfo:
+
+        if "acknowledged_by" in acknowledgementinfo.keys():
+            ackuserid = acknowledgementinfo.get("acknowledged_by", None)
+            acktime = acknowledgementinfo.get("acknowledgement_time", None)
+            if ackuserid in userid_username_dict.keys():
+                ackuser = userid_username_dict[ackuserid]
+            else:
+                ackuser = ackuserid
+
+            acknowledgement_info = "User:{} Time:{}".format(ackuser, acktime)
+
+    return acknowledgement_info
+
 
 
 def go():
@@ -482,6 +596,16 @@ def go():
         event_codes = eventcodes.split(",")
 
     events = get_events(cgx_session, numhours, stime, etime, event_codes, sitelist)
+    events = events.fillna("n/a")
+
+    events['time_ms'] = events['time'].apply(gettime_ms)
+    events['time_sms'] = events['time'].apply(gettime_sms)
+    events['entity_ref_text'] = events['entity_ref'].apply(get_entity)
+    events['info_text'] = events['info'].apply(get_info)
+    events['site'] = events['element_id'].apply(getsitename)
+    events['element'] = events['element_id'].apply(getelemname)
+    events['acknowledgement_info'] = events['acknowledgement_info'].apply(getackinfo)
+    events = events.drop(columns=["_etag","_created_on_utc","_updated_on_utc"])
 
     ############################################################################
     # Write to CSV
@@ -494,95 +618,9 @@ def go():
 
     # Set filenames
     csvfile = os.path.join('./', '%s_events_%s.csv' %(tenant_str, curtime_str))
-    with open(csvfile, 'w') as csv_file:
-        csv_file.write('Element,Serial Number,Site\n')
-        csv_file.flush()
-
-    csvdata = pd.DataFrame(columns=["time","time_ms","time_sms","code","id","severity","type","correlation_id","site","element","entity_ref","entity_ref text","info","info text","cleared","acknowledged","acknowledgement_info"])
-    print("INFO: Creating pandas dict")
-
-    firstbar = len(events) + 1
-    barcount = 1
-
-    # could be a long query - start a progress bar.
-    pbar = ProgressBar(widgets=[Percentage(), Bar(), ETA()], max_value=firstbar).start()
-
-    for event in events:
-        cleared = "n/a"
-        correlation_id = "n/a"
-        acknowledged = "n/a"
-        acknowledgement_info = "n/a"
-        site = "Unassigned"
-
-        if "." in event['time']:
-            date = datetime.datetime.strptime(event['time'], "%Y-%m-%dT%H:%M:%S.%fZ")
-        else:
-            date = datetime.datetime.strptime(event['time'], "%Y-%m-%dT%H:%M:%SZ")
-
-        time_ms = date.replace(microsecond=0)
-        time_ms = time_ms.isoformat() + "Z"
-        time_sms = date.replace(second=0, microsecond=0)
-        time_sms = time_sms.isoformat() + "Z"
-
-        entity_ref = get_entity(cgx_session, event)
-        info = get_info(cgx_session, event)
-
-        if event['element_id'] in eid_sid_dict.keys():
-            sid = eid_sid_dict[event['element_id']]
-            site = site_id_name_dict[sid]
-
-        else:
-            #print("INFO: Element not attached to site. {}".format(event))
-            site = "Unassigned"
-
-        if event['type'] == "alarm":
-            cleared = event['cleared']
-            correlation_id = event['correlation_id']
-            acknowledged = event['acknowledged']
-            if acknowledged:
-                acknowledgementinfo = event['acknowledgement_info']
-                ackuserid = acknowledgementinfo.get("acknowledged_by", None)
-                acktime = acknowledgementinfo.get("acknowledgement_time", None)
-                if ackuserid in userid_username_dict.keys():
-                    ackuser = userid_username_dict[ackuserid]
-                else:
-                    ackuser = ackuserid
-
-                acknowledgement_info = "User:{} Time:{}".format(ackuser,acktime)
-
-        if event['element_id'] in elem_id_name_dict.keys():
-            element = elem_id_name_dict[event['element_id']]
-        else:
-            element = event['element_id']
-
-        csvdata = csvdata.append({"time":event['time'],
-                                  "time_ms":time_ms,
-                                  "time_sms":time_sms,
-                                  "code":event['code'],
-                                  "id":event['id'],
-                                  "severity":event['severity'],
-                                  "type":event['type'],
-                                  "correlation_id":correlation_id,
-                                  "site":site,
-                                  "element":element,
-                                  "entity_ref":event['entity_ref'],
-                                  "entity_ref text":entity_ref,
-                                  "info":event['info'],
-                                  "info text":info,
-                                  "cleared":cleared,
-                                  "acknowledged":acknowledged,
-                                  "acknowledgement_info":acknowledgement_info},ignore_index=True)
-
-        barcount += 1
-        pbar.update(barcount)
-
-
-    # finish after iteration.
-    pbar.finish()
-
     print("INFO: Writing events to file {}".format(csvfile))
-    csvdata.to_csv(csvfile, index=False)
 
+    events.to_csv(csvfile, index=False)
 
     ############################################################################
     # Logout and exit script
