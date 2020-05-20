@@ -596,8 +596,13 @@ def go():
         event_codes = eventcodes.split(",")
 
     events = get_events(cgx_session, numhours, stime, etime, event_codes, sitelist)
-    events = events.fillna("n/a")
+    if len(events) == 0:
+        print("WARN: No events retrieved")
+        print("Logging out")
+        cgx_session.get.logout()
+        sys.exit()
 
+    events = events.fillna("n/a")
     events['time_ms'] = events['time'].apply(gettime_ms)
     events['time_sms'] = events['time'].apply(gettime_sms)
     events['entity_ref_text'] = events['entity_ref'].apply(get_entity)
