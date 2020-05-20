@@ -112,7 +112,7 @@ def get_events(cgx_session, numhours, starttime, endtime, event_codes, sitelist)
         print ("INFO: Getting {0} starting from {1} using query {2}".format(event_codes, start_time_iso, json.dumps(events_query_payload)))
         resp = cgx_session.post.events_query(data=events_query_payload)
         if resp.cgx_status:
-            eventlist += resp.cgx_content.get("items", None)
+            eventlist = resp.cgx_content.get("items", None)
             dp = pd.DataFrame(eventlist)
             eventsdf = pd.concat([eventsdf,dp], ignore_index=True)
 
@@ -120,8 +120,55 @@ def get_events(cgx_session, numhours, starttime, endtime, event_codes, sitelist)
             print ("\tTotal events: {0}. Events Retrieved: {1}. Events Pending: {2}".format(resp.cgx_content['total_count'],resp.cgx_content['included_count'], (resp.cgx_content['total_count']-resp.cgx_content['included_count']) ))
 
             if offset:
-                events_query_payload['start_time'] = start_time_iso
                 events_query_payload['_offset'] = offset
+                more_events = True
+
+            else:
+                more_events = False
+
+        else:
+            print ("ERR: Failed to get events: {}".format(resp.cgx_content))
+            print(cloudgenix.jd_detailed(resp))
+
+            more_events = False
+            return []
+
+
+    # Get Standing events:
+    standingevents_query_payload = {
+        "limit":
+            {
+                "count": 100,
+                "sort_on": "time",
+                "sort_order": "descending"
+            },
+        "query": {
+            "code": event_codes,
+            "site": sitelist
+        },
+        "severity": [],
+        "start_time": None,
+        "end_time": None
+    }
+
+    print("INFO: Getting standing alarms")
+    more_events = True
+    while more_events:
+        print ("INFO: Getting {0} starting from {1} using query {2}".format(event_codes, start_time_iso,
+                                                                            json.dumps(standingevents_query_payload)))
+        resp = cgx_session.post.events_query(data=standingevents_query_payload)
+        if resp.cgx_status:
+            eventlist = resp.cgx_content.get("items", None)
+            dp = pd.DataFrame(eventlist)
+            eventsdf = pd.concat([eventsdf, dp], ignore_index=True)
+
+            offset = resp.cgx_content['_offset']
+            print ("\tTotal events: {0}. Events Retrieved: {1}. Events Pending: {2}".format(
+                resp.cgx_content['total_count'], resp.cgx_content['included_count'],
+                (resp.cgx_content['total_count'] - resp.cgx_content['included_count'])))
+
+            if offset:
+                standingevents_query_payload['_offset'] = offset
                 more_events = True
 
             else:
