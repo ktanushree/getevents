@@ -81,6 +81,7 @@ Filters for events:
 #### Version
 | Version | Build | Changes |
 | ------- | ----- | ------- |
+| **1.0.0** | **b6** | Minor bug fixes.|
 | **1.0.0** | **b5** | Included idname utility. Made edits to include VPN link name in info.|
 | **1.0.0** | **b4** | Minor bug fixes. Acknowledgment info now lists username and email.|
 | **1.0.0** | **b3** | Minor bug fixes.|

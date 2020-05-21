@@ -114,6 +114,22 @@ def get_events(cgx_session, numhours, starttime, endtime, event_codes, sitelist)
         if resp.cgx_status:
             eventlist = resp.cgx_content.get("items", None)
             dp = pd.DataFrame(eventlist)
+
+            if len(dp)>0:
+                seta = set(dp.id.unique())
+
+                if len(eventsdf) > 0:
+                    setb = set(eventsdf.id.unique())
+
+                    duplicates = list(seta & setb)
+                    if duplicates:
+                        #print("\n\n!!!!! Duplicate event returned !!!!!")
+                        #print("{}\n\n".format(duplicates))
+                        for id in duplicates:
+                            #print("Removing duplicate event {} from dp".format(id))
+                            dp = dp[dp.id != id]
+
+
             eventsdf = pd.concat([eventsdf,dp], ignore_index=True)
 
             offset = resp.cgx_content['_offset']
@@ -160,6 +176,23 @@ def get_events(cgx_session, numhours, starttime, endtime, event_codes, sitelist)
         if resp.cgx_status:
             eventlist = resp.cgx_content.get("items", None)
             dp = pd.DataFrame(eventlist)
+
+            if len(dp) > 0:
+                seta = set(dp.id.unique())
+
+                if len(eventsdf) > 0:
+                    setb = set(eventsdf.id.unique())
+
+                    duplicates = list(seta & setb)
+                    if duplicates:
+                        #print("\n\n!!!!! Duplicate event returned !!!!!")
+                        #print("{}".format(duplicates))
+                        for id in duplicates:
+                            #print("Removing duplicate event {} from dp".format(id))
+                            dp = dp[dp.id != id]
+
+                        #print("\n\n")
+
             eventsdf = pd.concat([eventsdf, dp], ignore_index=True)
 
             offset = resp.cgx_content['_offset']
