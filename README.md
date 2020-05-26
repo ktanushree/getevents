@@ -22,17 +22,20 @@ MIT
 ### Examples of usage:
 Get events from a site:
 ```
-./getevents.py -S Sitename 
+./getevents.py -S Sitename -H 3
 ```
 Get events from a multiple sites:
 ``` 
-./getevents.py -S Site1,Site2,Site3
+./getevents.py -S Site1,Site2,Site3 -H 5
 ```
 Get events for specific event codes:
 ```angular2
-./getevents.py -EC NETWORK_VPNLINK_DOWN,NETWORK_DIRECTINTERNET_DOWN
+./getevents.py -EC NETWORK_VPNLINK_DOWN,NETWORK_DIRECTINTERNET_DOWN -H 24
 ```
-
+Get events for specific time range:
+```angular2
+./getevents.py -H RANGE -ST 2020-04-01T00:00:00Z -ET 2020-04-10T00:00:00Z
+```
 Use the -H hours to specify the time delta in hours for the event query.
 
 Help Text:
