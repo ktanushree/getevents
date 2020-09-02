@@ -9,7 +9,7 @@ Enables downloading of alarms and alerts raised on the CloudGenix managed networ
 * Active CloudGenix Account
 * Python >= 2.7 or >=3.6
 * Python modules:
-    * CloudGenix Python SDK >= 5.2.1b1 - <https://github.com/CloudGenix/sdk-python>
+    * CloudGenix Python SDK >= 5.1.1b1 - <https://github.com/CloudGenix/sdk-python>
     * CloudGenix ID-Name Utility >= 2.0.1 - <https://github.com/ebob9/cloudgenix-idname>
 * ProgressBar2
 
@@ -22,20 +22,17 @@ MIT
 ### Examples of usage:
 Get events from a site:
 ```
-./getevents.py -S Sitename -H 3
+./getevents.py -S Sitename 
 ```
 Get events from a multiple sites:
 ``` 
-./getevents.py -S Site1,Site2,Site3 -H 5
+./getevents.py -S Site1,Site2,Site3
 ```
 Get events for specific event codes:
 ```angular2
-./getevents.py -EC NETWORK_VPNLINK_DOWN,NETWORK_DIRECTINTERNET_DOWN -H 24
+./getevents.py -EC NETWORK_VPNLINK_DOWN,NETWORK_DIRECTINTERNET_DOWN
 ```
-Get events for specific time range:
-```angular2
-./getevents.py -H RANGE -ST 2020-04-01T00:00:00Z -ET 2020-04-10T00:00:00Z
-```
+
 Use the -H hours to specify the time delta in hours for the event query.
 
 Help Text:
@@ -84,6 +81,7 @@ Filters for events:
 #### Version
 | Version | Build | Changes |
 | ------- | ----- | ------- |
+| **1.0.0** | **b7** | Minor bug fixes. |
 | **1.0.0** | **b6** | Minor bug fixes.|
 | **1.0.0** | **b5** | Included idname utility. Made edits to include VPN link name in info.|
 | **1.0.0** | **b4** | Minor bug fixes. Acknowledgment info now lists username and email.|

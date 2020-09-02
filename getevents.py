@@ -21,6 +21,7 @@ import codecs
 import csv
 import cloudgenix
 import cloudgenix_idname
+import math
 
 # bar
 from progressbar import Bar, ETA, Percentage, ProgressBar
@@ -110,7 +111,7 @@ def get_events(cgx_session, numhours, starttime, endtime, event_codes, sitelist)
     more_events=True
     while more_events:
         print ("INFO: Getting {0} starting from {1} using query {2}".format(event_codes, start_time_iso, json.dumps(events_query_payload)))
-        resp = cgx_session.post.events_query(data=events_query_payload)
+        resp = cgx_session.post.events_query(data=events_query_payload, api_version='v3.1')
         if resp.cgx_status:
             eventlist = resp.cgx_content.get("items", None)
             dp = pd.DataFrame(eventlist)
@@ -123,12 +124,13 @@ def get_events(cgx_session, numhours, starttime, endtime, event_codes, sitelist)
 
                     duplicates = list(seta & setb)
                     if duplicates:
-                        #print("\n\n!!!!! Duplicate event returned !!!!!")
-                        #print("{}\n\n".format(duplicates))
+                        print("\n\n!!!!! Duplicate event returned !!!!!")
+                        print("{}\n\n".format(duplicates))
                         for id in duplicates:
-                            #print("Removing duplicate event {} from dp".format(id))
+                            print("Removing duplicate event {} from dp".format(id))
                             dp = dp[dp.id != id]
 
+                        print("\n\n")
 
             eventsdf = pd.concat([eventsdf,dp], ignore_index=True)
 
@@ -185,13 +187,13 @@ def get_events(cgx_session, numhours, starttime, endtime, event_codes, sitelist)
 
                     duplicates = list(seta & setb)
                     if duplicates:
-                        #print("\n\n!!!!! Duplicate event returned !!!!!")
-                        #print("{}".format(duplicates))
+                        print("\n\n!!!!! Duplicate event returned !!!!!")
+                        print("{}".format(duplicates))
                         for id in duplicates:
-                            #print("Removing duplicate event {} from dp".format(id))
+                            print("Removing duplicate event {} from dp".format(id))
                             dp = dp[dp.id != id]
 
-                        #print("\n\n")
+                        print("\n\n")
 
             eventsdf = pd.concat([eventsdf, dp], ignore_index=True)
 
@@ -213,6 +215,10 @@ def get_events(cgx_session, numhours, starttime, endtime, event_codes, sitelist)
 
             more_events = False
             return []
+
+    print("DEBUG: Saving raw events")
+    rawfile = os.path.join('./', 'cgxdebug_rawevents.csv')
+    eventsdf.to_csv(rawfile,index=False)
 
     return eventsdf
 
@@ -361,42 +367,43 @@ def createdicts(cgx_session):
 
 
 def get_info(alarminfo):
-    peerid = alarminfo.get("peer_site_id", None)
-    anynetid = alarminfo.get("al_id",None)
-    vpn_link_id = alarminfo.get("vpn_link_id",None)
-    info = None
-    if peerid:
-        if peerid in site_id_name_dict.keys():
-            peersite = site_id_name_dict[peerid]
-            info = "Peer Site: {}".format(peersite)
+    if alarminfo:
+        peerid = alarminfo.get("peer_site_id", None)
+        anynetid = alarminfo.get("al_id",None)
+        vpn_link_id = alarminfo.get("vpn_link_id",None)
+        info = None
+        if peerid:
+            if peerid in site_id_name_dict.keys():
+                peersite = site_id_name_dict[peerid]
+                info = "Peer Site: {}".format(peersite)
 
-    if anynetid:
-        if anynetid in path_id_name_dict.keys():
-            info = path_id_name_dict[anynetid]
-        else:
-            info = "Could not query anynet link {}".format(anynetid)
+        if anynetid:
+            if anynetid in path_id_name_dict.keys():
+                info = path_id_name_dict[anynetid]
+            else:
+                info = "Could not query anynet link {}".format(anynetid)
 
-    if vpn_link_id:
-        if vpn_link_id in path_id_name_dict.keys():
-            info = path_id_name_dict[vpn_link_id]
-        else:
-            info = "Could not query vpn link {}".format(vpn_link_id)
+        if vpn_link_id:
+            if vpn_link_id in path_id_name_dict.keys():
+                info = path_id_name_dict[vpn_link_id]
+            else:
+                info = "Could not query vpn link {}".format(vpn_link_id)
 
-    if "element_id" in alarminfo.keys():
-        elemid = alarminfo.get("element_id",None)
-        interfaceid = alarminfo.get("interface_id",None)
-        siteid = eid_sid_dict[elemid]
-        iname = None
+        if "element_id" in alarminfo.keys():
+            elemid = alarminfo.get("element_id",None)
+            interfaceid = alarminfo.get("interface_id",None)
+            iname = None
 
-        if interfaceid in intf_id_name_dict.keys():
-            iname = intf_id_name_dict[interfaceid]
+            if interfaceid in intf_id_name_dict.keys():
+                iname = intf_id_name_dict[interfaceid]
 
-        if iname:
-            info = "Element: {}\nInterface: {}".format(elem_id_name_dict[elemid], iname)
-        else:
-            info = "Element: {}".format(elem_id_name_dict[elemid])
+            if iname:
+                info = "Element: {}\nInterface: {}".format(elem_id_name_dict[elemid], iname)
+            else:
+                info = "Element: {}".format(elem_id_name_dict[elemid])
 
-
+    else:
+        info = "n/a"
     return info
 
 
@@ -501,7 +508,10 @@ def getsitename(elemid):
     site = "Unassigned"
     if elemid in eid_sid_dict.keys():
         sid = eid_sid_dict[elemid]
-        site = site_id_name_dict[sid]
+        if sid == "1":
+            site = "Unassigned"
+        else:
+            site = site_id_name_dict[sid]
 
     return site
 
@@ -516,11 +526,9 @@ def getelemname(elemid):
 
 def getackinfo(acknowledgementinfo):
     acknowledgement_info = "n/a"
-
-    if acknowledgementinfo == "n/a":
-        return acknowledgement_info
-
     if acknowledgementinfo:
+        if isinstance(acknowledgementinfo, float):
+            return "N/A"
 
         if "acknowledged_by" in acknowledgementinfo.keys():
             ackuserid = acknowledgementinfo.get("acknowledged_by", None)
@@ -682,7 +690,7 @@ def go():
         cgx_session.get.logout()
         sys.exit()
 
-    events = events.fillna("n/a")
+    #events = events.fillna("n/a")
     events['time_ms'] = events['time'].apply(gettime_ms)
     events['time_sms'] = events['time'].apply(gettime_sms)
     events['entity_ref_text'] = events['entity_ref'].apply(get_entity)
@@ -706,6 +714,10 @@ def go():
     print("INFO: Writing events to file {}".format(csvfile))
 
     events.to_csv(csvfile, index=False)
+    rawfile = os.path.join('./', 'cgxdebug_rawevents.csv')
+    if os.path.exists(rawfile):
+        print("DEBUG: Deleting raw events")
+        os.remove(rawfile)
 
     ############################################################################
     # Logout and exit script
