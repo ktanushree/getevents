@@ -569,7 +569,7 @@ def go():
     site_group = parser.add_argument_group('Filters for events', 'The following attributes will be used to query events')
     site_group.add_argument("--eventcodes", "-EC", help="List event codes you want to query for", default=None)
     site_group.add_argument("--sitename", "-S", help="Name of the Site you want events filtered for. For multiple sites, separate names by using a comma.", default=None)
-    site_group.add_argument("--hour", "-H", help="Number of hours from now you need the events queried for. Or use the keyword RANGE to provide a time range", default=None)
+    site_group.add_argument("--hour", "-H", help="Number of hours from now you need the events queried for. Or use the keyword RANGE to provide a time range", default=3)
     site_group.add_argument("--starttime", "-ST", help="Start time in format YYYY-MM-DDTHH:MM:SSZ", default=None)
     site_group.add_argument("--endtime", "-ET", help="End time in format YYYY-MM-DDTHH:MM:SSZ", default=None)
 
