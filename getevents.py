@@ -2,9 +2,9 @@
 
 """
 
-Get CGX Events
-tanushree@cloudgenix.com
-
+Get Prisma SDWAN Events
+tkamath@paloaltonetworks.com
+Version: 1.0.0b8
 """
 
 import pandas as pd
@@ -30,7 +30,7 @@ from progressbar import Bar, ETA, Percentage, ProgressBar
 # Global Vars
 SDK_VERSION = cloudgenix.version
 SCRIPT_NAME = 'CloudGenix: Get Events Script'
-
+SCRIPT_VERSION = "1.0.0b8"
 
 # Process tags
 
