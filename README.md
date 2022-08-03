@@ -90,6 +90,7 @@ Filters for events:
 #### Version
 | Version | Build | Changes |
 | ------- | ----- | ------- |
+| **1.0.0** | **b8** | Numhours set to 3 hours. Updated README with examples for time range |
 | **1.0.0** | **b7** | Minor bug fixes. |
 | **1.0.0** | **b6** | Minor bug fixes.|
 | **1.0.0** | **b5** | Included idname utility. Made edits to include VPN link name in info.|
