@@ -2,7 +2,7 @@
 This utility is used to download events from the CloudGenix managed network to a CSV file.
 
 #### Synopsis
-Enables downloading of alarms and alerts raised on the CloudGenix managed network. The user can filter events by Site, event codes and based on the start time.
+Enables downloading of alarms and alerts raised on the CloudGenix managed network. The user can filter events by Site, event codes and based on the start time. Numhours is set to 3 by default. To retrieve events from a specific time range, use the keyword RANGE. See usage examples below.
 
 
 #### Requirements
@@ -20,18 +20,27 @@ MIT
  - **Github:** Download files to a local directory, manually run `getevents.py`. 
 
 ### Examples of usage:
-Get events from a site:
+Get events from a site (past 3 hours):
 ```
 ./getevents.py -S Sitename 
 ```
-Get events from a multiple sites:
+Get events from a site for the past 24 hours:
+```
+./getevents.py -S Sitename -H 24 
+```
+Get events from a site for a specific time range:
+```
+./getevents.py -S Sitename -H RANGE -ST 2022-08-01T00:00:00Z -ET 2022-08-02T00:00:00Z
+```
+Get events from a multiple sites (past 3 hours):
 ``` 
 ./getevents.py -S Site1,Site2,Site3
 ```
-Get events for specific event codes:
+Get events for specific event codes (past 3 hours):
 ```angular2
 ./getevents.py -EC NETWORK_VPNLINK_DOWN,NETWORK_DIRECTINTERNET_DOWN
 ```
+
 
 Use the -H hours to specify the time delta in hours for the event query.
 
